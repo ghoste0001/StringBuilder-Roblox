@@ -6,6 +6,7 @@
 <br><br>
 <a href="https://ghoste0001.github.io/StringBuilder-Roblox/"><img src="./svgs/documentation_learn.svg"></img></a>
 <br>
+<br>
 
 > [!NOTE]  
 > There may be **bugs**, so be sure to report any you encounter.
