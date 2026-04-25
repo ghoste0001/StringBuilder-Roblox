@@ -18,6 +18,8 @@
 	Remade from the ground up using buffers for maximum performance.
 	
 	
+	SOURCE: https://github.com/ghoste0001/StringBuilder-Roblox
+	
 	LICENSE: Source code is licensed under Eclipse Public License - v2.0
 	
 	THE ACCOMPANYING PROGRAM IS PROVIDED UNDER THE TERMS OF THIS ECLIPSE
