@@ -6,10 +6,8 @@
 	@author: Ghost (withoutruless)
 	@description: Blazing-fast string builder library similar to C#, faster than Luau's native string concat.
 	
-	
 	Nearly full coverage of StringBuilder's (C#) functions,
 	memory efficient, powerful AND way faster than Roblox's string concatenation
-	(Hundreds of times faster than "a".."b")
 	
 	StringBuilder also supports being packed into a buffer that can be unpacked back into a StringBuilder object
 	And supports compressing that said buffer for a smaller footprint (for datastores or sending over network)
