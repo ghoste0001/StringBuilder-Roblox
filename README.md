@@ -1,5 +1,5 @@
-<img src="./docs/icon.png" style="width:190px;height:190px;"></img>
-# StringBuilder
+<img src="./docs/banner_rounded.png" style="height:100px;"></img>
+<br>
 <strong>A blazing-fast string builder library for Luau, performing significantly faster than native string concatenation.</strong>
 <br><br>
 <a href="https://ghoste0001.github.io/StringBuilder-Roblox/"><img src="./svgs/documentation_learn.svg"></img></a>
