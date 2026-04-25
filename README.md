@@ -1,4 +1,4 @@
-<img src="./docs/icon.png" style="width:75px;height:75px;"></img>
+<img src="./docs/icon.png" style="width:190px;height:190px;"></img>
 # StringBuilder
 <strong>An easy to understand roblox module for managing sounds and sound effects.</strong>
 <br><br>
