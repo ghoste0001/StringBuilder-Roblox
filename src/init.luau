@@ -13,7 +13,7 @@
 	And supports compressing that said buffer for a smaller footprint (for datastores or sending over network)
 	
 	Inspired by depthso's original concept. 
-	Remade from the ground up using buffers for maximum performance.
+	Remade from the ground up using buffers for maximum memory efficiency.
 	
 	
 	SOURCE: https://github.com/ghoste0001/StringBuilder-Roblox
