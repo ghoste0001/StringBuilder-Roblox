@@ -31,7 +31,7 @@ theme:
   logo: icon.png
   favicon: icon.png
   font:
-    text: Montserrat
+    text: Inter
     code: JetBrains Mono
   icon:
     repo: fontawesome/brands/github
