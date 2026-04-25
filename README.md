@@ -1,4 +1,6 @@
+<picture>
 <img src="./docs/banner_rounded.png" style="height:100px;"></img>
+</picture>
 <br>
 <strong>A blazing-fast string builder library for Luau, performing significantly faster than native string concatenation.</strong>
 <br><br>
