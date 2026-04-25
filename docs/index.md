@@ -1,3 +1,9 @@
+---
+hide:
+- navigation
+- toc
+---
+
 # StringBuilder
 
 > A blazing-fast string builder library for Luau, performing significantly faster than native string concatenation.

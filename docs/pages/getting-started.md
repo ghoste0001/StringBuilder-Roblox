@@ -1,4 +1,9 @@
-# Usage Guide
+---
+hide:
+- navigation
+---
+
+# Getting Started
 
 Using `StringBuilder` is super straightforward. Here's a quick walkthrough of how to use it!
 

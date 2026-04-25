@@ -1,3 +1,8 @@
+---
+hide:
+- navigation
+---
+
 # API Reference
 
 Here's the full list of everything you can do with StringBuilder!
