@@ -62,7 +62,7 @@
     textBuilder:Append("<- Or like this!") -- no need to add a space, Space() already handled it.
     
     -- StringBuilder also has chaining support:
-    textBuilder:Append("Hello"):Space():Append("Again!")
+    textBuilder:Append("Hello,"):Space():Append("Again!")
 	print(textBuilder) -- output: "Hello, Again!"
 ]]
 
