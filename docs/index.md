@@ -14,7 +14,7 @@ hide:
 
 StringBuilder provides nearly full coverage of the robust C# `StringBuilder` API. It is memory efficient, incredibly powerful, and **way faster** than native Roblox string concatenation (`"a" .. "b"`). 
 
-Inspired by depthso's original concept, but remade completely from the ground up using **buffers** for absolute maximum performance.
+Inspired by depthso's original concept, but remade completely from the ground up using **buffers** for maximum memory efficiency and capability.
 
 ### Key Features
 
