@@ -23,7 +23,6 @@ Appending data writes it directly into the builder's buffer.
 -- Add some text to it:
 textBuilder:Append("Hello, World!")
 
--- Output the current string
 print(textBuilder) -- You can also use textBuilder:ToString()
 -- Output: "Hello, World!"
 ```
@@ -33,6 +32,7 @@ print(textBuilder) -- You can also use textBuilder:ToString()
 
     ```lua
     textBuilder:Append(" <- Like this")
+
     textBuilder:Space()
     textBuilder:Append("<- Or like this!")
     ```
@@ -41,6 +41,7 @@ print(textBuilder) -- You can also use textBuilder:ToString()
 You can easily swap occurrences of a substring dynamically.
 
 ```lua
+textBuilder:Append("Hello, World!")
 -- Replace every occurrence of the word "World" with "Ghost"
 textBuilder:Replace("World", "Ghost")
 

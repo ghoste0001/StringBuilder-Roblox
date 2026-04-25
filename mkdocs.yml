@@ -4,19 +4,45 @@ repo_url: https://github.com/ghoste0001/StringBuilder-Roblox
 
 theme:
   name: material
-  palette:
-    scheme: slate # Dark mode by default
-    primary: deep orange
+  logo: icon.png
+  font:
+    text: Montserrat
+    code: JetBrains Mono
+  icon:
+    edit: material/pencil
+    view: material/eye
+    admonition:
+      note: fontawesome/solid/note-sticky
+      abstract: fontawesome/solid/book
+      info: fontawesome/solid/circle-info
+      tip: fontawesome/solid/bullhorn
+      success: fontawesome/solid/check
+      question: fontawesome/solid/circle-question
+      warning: fontawesome/solid/triangle-exclamation
+      failure: fontawesome/solid/bomb
+      danger: fontawesome/solid/skull
+      bug: fontawesome/solid/robot
+      example: fontawesome/solid/flask
+      quote: fontawesome/solid/quote-left
   features:
+    - navigation.instant
+    - navigation.instant.progress
     - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - navigation.footer
+    - content.action.edit
     - content.code.copy
-    - content.code.annotate
+    - content.tooltips
+    - header.autohide
+  palette:
+    primary: deep purple
+    scheme: slate
 
 plugins:
   - search
   - mkdocstrings:
-      default_handler: python # Placeholder for docstring parsing
-
+      default_handler: python
 nav:
   - Home: index.md
   - API Reference: api.md
