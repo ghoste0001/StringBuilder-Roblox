@@ -47,6 +47,32 @@ Same as `Append`, except with formatting built-in!
 StringBuilder:AppendJoin(Data: {any?}, Sep: string?): StringBuilder
 ```
 Takes an array of items and strings them together, throwing your `Sep` string right between each one (like commas).
+!!! warning "As this uses `table.concat`, it will error if you pass anything other than strings or numbers!"
+
+### `AppendList`
+```lua
+StringBuilder:AppendList(...): StringBuilder
+```
+Concatenates and appends any number of string or number arguments. Way faster than chaining appends together!
+!!! warning "As this uses `table.concat`, it will error if you pass anything other than strings or numbers!"
+
+### `Compare`
+```lua
+StringBuilder:Compare(self2: StringBuilder): boolean
+```
+Compares this StringBuilder with another one and returns `true` if their contents are fully identical!
+
+### `GetCharacters`
+```lua
+StringBuilder:GetCharacters(Index: number, Count: number?): string
+```
+Grabs specific character(s) starting from your given `Index`. `Count` defaults to 1, but you can pass negative or positive numbers to grab more (negative values dont return reversed strings).
+
+### `SetCharacters`
+```lua
+StringBuilder:SetCharacters(Index: number, Data: any): StringBuilder
+```
+Overwrites any character(s) starting at your `Index` directly with the new `Data`!
 
 ### `Insert`
 ```lua
@@ -112,11 +138,12 @@ Returns the current length of your string in bytes.
 
 ### `SetLength`
 ```lua
-StringBuilder:SetLength(Length: number)
+StringBuilder:SetLength(Length: number): boolean
 ```
-Manually sets the length of the string.
+Manually sets the length of the string!
 - If it's smaller, it instantly truncates your string.  
 - If it's larger than your current capacity, it forces a buffer expansion.
+Returns `true` if successful, or `false` if your length is negative.
 
 ### `GetCapacity`
 ```lua
@@ -124,11 +151,18 @@ StringBuilder:GetCapacity(): number
 ```
 Returns your current capacity in bytes.
 
+### `EnsureCapacity`
+```lua
+StringBuilder:EnsureCapacity(EnsuredCapacity: number): (boolean, number)
+```
+Makes sure your buffer is at least as big as `EnsuredCapacity`! Returns `true` if it had to/could resize, alongside your new capacity. 
+!!! warning "This is capped by your `StringBuilder`'s max capacity, so be sure to check if the returned capacity is enough!"
+
 ### `SetCapacity`
 ```lua
-StringBuilder:SetCapacity(Capacity: number)
+StringBuilder:SetCapacity(Capacity: number): number
 ```
-Manually set the capacity safely. It resizes the buffer, and any out of bounds data just gets cut off.
+Manually set the capacity safely! It resizes the buffer, and any out of bounds data just gets cut off. Returns the new actual capacity (capped by your max capacity!).
 
 ### `GetMaxCapacity`
 ```lua

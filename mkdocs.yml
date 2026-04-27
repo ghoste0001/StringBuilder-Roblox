@@ -17,6 +17,7 @@ plugins:
       default_handler: python
       
 markdown_extensions:
+  - attr_list
   - admonition
   - pymdownx.details
   - pymdownx.superfences
