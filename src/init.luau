@@ -389,13 +389,13 @@ end
     Set character(s) starting from index
     Data can be a string or any tostring convertable type
 ]]
-function StringBuilder.SetCharacters(self: StringBuilder, Index: number, Data: any)
+function StringBuilder.SetCharacters(self: StringBuilder, Index: number, Data: any): StringBuilder
 	if not Index or Index < 0 then
-		return
+		return self
 	end
-	if Data == nil then return end
+	if Data == nil then return self end
 	local strData = tostring(Data)
-	if not strData or strData == "" then return end
+	if not strData or strData == "" then return self end
 	
 	local Count = #strData
 	local NewLength = Index+Count
@@ -409,6 +409,7 @@ function StringBuilder.SetCharacters(self: StringBuilder, Index: number, Data: a
 	if NewLength > self._Length then
 		self._Length = NewLength
 	end
+	return self
 end
 
 --[[
