@@ -209,7 +209,7 @@ Destroys the object. Leaves the buffer to be cleaned up by the garbage collector
 
 ## Packing & Compression
 
-These are mostly for internal use and networking, but they're here if you want them!
+These are mostly for networking or datastores!
 
 ### `Pack`
 ```lua
@@ -221,8 +221,7 @@ Packs the StringBuilder's data and metadata all together into a buffer!
 ```lua
 StringBuilder:Compress(CompressionLevel: number?): buffer
 ```
-Compresses the StringBuilder with Zstd 
-`CompressionLevel` is optional and must range from `-7 to 22`: higher means more compression at the cost of more time. Returns a packed and compressed buffer.
+Compresses the StringBuilder with Zstd. `CompressionLevel` is optional and must range from `-7 to 22`: higher means more compression at the cost of more time. Returns a packed and compressed buffer.
 
 ### `FromBuffer`
 ```lua
