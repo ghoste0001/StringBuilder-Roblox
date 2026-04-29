@@ -87,7 +87,7 @@ type StringBuilder = setmetatable<{
 --// Defaults
 local COMPRESSION_ALGORITHM = Enum.CompressionAlgorithm.Zstd -- Default: Zstd (its the only one available)
 local COMPRESSION_LEVEL = 0 -- Default: 0 (-7 to 22, higher = more compression at the cost of performance)
-local DEFAULT_MAX_CAPACITY = 1*1024*1024 -- Default: 1*1024*1024 (byte > kilobyte > megabyte)
+local DEFAULT_MAX_CAPACITY = 4*1024*1024 -- Default: 4*1024*1024 (byte > kilobyte > megabyte)
 local DEFAULT_CAPACITY = 64 -- Default: 64 (In bytes)
 local MIN_MAX_CAPACITY = 1 -- Default: 1 (In bytes)
 local MIN_CAPACITY = 1 -- Default: 1 (In bytes)
@@ -95,7 +95,13 @@ local MIN_CAPACITY = 1 -- Default: 1 (In bytes)
 --// Constants
 local MAX_ROBLOX_BUFFER_SIZE = 1024*1024*1024 -- 1073741824 bytes (1GB), this is the max size a buffer in roblox can be.
 
---/ Compression related magic numbers
+--/ Buffer related
+
+--/ U8 values
+local BUF_SPACE = 32 -- " "
+local BUF_NEWLINE = 10 -- "\n"
+
+--/ Compression values and offsets
 local U16 = 2
 local U32 = 4
 
@@ -108,40 +114,43 @@ local HEADER_SIZE = U16+U32+U32+U32
 --/ Print related
 local PRINT_PREFIX = "[StringBuilder]: "
 
---// Functions
+--// Localized Functions
 
 --/ Buffer
-local bufferlen = buffer.len
-local create = buffer.create
-local copy = buffer.copy
+local buffer_len = buffer.len
+local buffer_create = buffer.create
+local buffer_copy = buffer.copy
 -- Read
-local readstring = buffer.readstring
-local readu32 = buffer.readu32
-local readu16 = buffer.readu16
-local readu8 = buffer.readu8
+local buffer_readstring = buffer.readstring
+local buffer_readu32 = buffer.readu32
+local buffer_readu16 = buffer.readu16
+local buffer_readu8 = buffer.readu8
 -- Write
-local writestring = buffer.writestring
-local writeu32 = buffer.writeu32
-local writeu16 = buffer.writeu16
-local writeu8 = buffer.writeu8
+local buffer_writestring = buffer.writestring
+local buffer_writeu32 = buffer.writeu32
+local buffer_writeu16 = buffer.writeu16
+local buffer_writeu8 = buffer.writeu8
 
 --/ Math
-local clamp = math.clamp
-local floor = math.floor
-local min = math.min
-local max = math.max
+local math_clamp = math.clamp
+local math_floor = math.floor
+local math_min = math.min
+local math_max = math.max
 
 --/ String
-local format = string.format
+local string_format = string.format
+local string_find = string.find
+local string_sub = string.sub
 local tostring = tostring
-local find = string.find
-local sub = string.sub
 
 --/ Table
-local insert = table.insert
-local concat = table.concat
+local table_insert = table.insert
+local table_concat = table.concat
+local table_clear = table.clear
 
 --/ Other
+local error = error
+local pcall = pcall
 local type = type
 
 -------------------------------------------
@@ -158,12 +167,12 @@ local function ResizeBuffer(self: StringBuilder, newLength: number)
 		return true 
 	end
 
-	local targetCapacity = max(currentCapacity * 2, newLength + DEFAULT_CAPACITY)
+	local targetCapacity = math_max(currentCapacity * 2, newLength + DEFAULT_CAPACITY)
 
-	targetCapacity = min(targetCapacity, self._MaxCapacity)
+	targetCapacity = math_min(targetCapacity, self._MaxCapacity)
 
 	if targetCapacity < newLength then
-		error(table.concat({
+		error(table_concat({
 			PRINT_PREFIX,
 			"buffer resize failed.",
 			" requested=",
@@ -174,9 +183,9 @@ local function ResizeBuffer(self: StringBuilder, newLength: number)
 	end
 
 	local oldBuf = self._Buffer
-	local newBuf = create(targetCapacity)
+	local newBuf = buffer_create(targetCapacity)
 
-	copy(newBuf, 0, oldBuf, 0, self._Length)
+	buffer_copy(newBuf, 0, oldBuf, 0, self._Length)
 
 	self._Buffer = newBuf
 	self._Capacity = targetCapacity
@@ -190,14 +199,14 @@ end
 	Returns a new StringBuilder object.
 ]]
 function StringBuilder.new(Capacity: number?, MaxCapacity: number?): StringBuilder
-	Capacity = max(MIN_CAPACITY, Capacity or DEFAULT_CAPACITY)
-	MaxCapacity = max(MIN_MAX_CAPACITY, Capacity, MaxCapacity or DEFAULT_MAX_CAPACITY)
+	Capacity = math_max(MIN_CAPACITY, Capacity or DEFAULT_CAPACITY)
+	MaxCapacity = math_max(MIN_MAX_CAPACITY, Capacity, MaxCapacity or DEFAULT_MAX_CAPACITY)
 
-	MaxCapacity = min(MaxCapacity,MAX_ROBLOX_BUFFER_SIZE) -- Clamp to 1GB
-	Capacity = min(Capacity,MAX_ROBLOX_BUFFER_SIZE) -- Same here
+	MaxCapacity = math_min(MaxCapacity,MAX_ROBLOX_BUFFER_SIZE) -- Clamp to 1GB
+	Capacity = math_min(Capacity,MAX_ROBLOX_BUFFER_SIZE) -- Same here
 
 	return setmetatable({
-		_Buffer = create(Capacity),
+		_Buffer = buffer_create(Capacity),
 		_MaxCapacity = MaxCapacity,
 		_Capacity = Capacity,
 		_Length = 0,
@@ -209,21 +218,21 @@ end
     Metadata: Capacity, MaxCapacity, Length
     Mostly for compression internally but its here if you want it.
     This is the layout for the buffer:
-
+	
     [ID][CAPACITY][MAX_CAPACITY][LENGTH][STRING]
     In data types: [U16][U32][U32][U32][STRING]
 ]]
 function StringBuilder.Pack(self: StringBuilder): buffer
 	local dataSize = self._Length
 
-	local out = create(HEADER_SIZE + dataSize)
+	local out = buffer_create(HEADER_SIZE + dataSize)
 
-	writeu16(out, 0, PACKED_BIT) -- Id is always at 0 offset
-	writeu32(out, PACKED_CAPACITY_OFFSET, self._Capacity)
-	writeu32(out, PACKED_MAX_CAPACITY_OFFSET, self._MaxCapacity)
-	writeu32(out, PACKED_LENGTH_OFFSET, self._Length)
+	buffer_writeu16(out, 0, PACKED_BIT) -- Id is always at 0 offset
+	buffer_writeu32(out, PACKED_CAPACITY_OFFSET, self._Capacity)
+	buffer_writeu32(out, PACKED_MAX_CAPACITY_OFFSET, self._MaxCapacity)
+	buffer_writeu32(out, PACKED_LENGTH_OFFSET, self._Length)
 
-	copy(out, HEADER_SIZE, self._Buffer, 0, dataSize)
+	buffer_copy(out, HEADER_SIZE, self._Buffer, 0, dataSize)
 
 	return out
 end
@@ -235,46 +244,45 @@ function StringBuilder.FromBuffer(data: buffer): StringBuilder?
 	if not data then return nil end
 	local success, decompressed = pcall(EncodingService.DecompressBuffer, EncodingService, data, COMPRESSION_ALGORITHM)
 	if not success then decompressed = data end -- If its not compressed, use it as is.
-	if bufferlen(decompressed) < HEADER_SIZE then return nil end -- Return if the buffer is smaller then the header size
+	if buffer_len(decompressed) < HEADER_SIZE then return nil end -- Return if the buffer is smaller then the header size
 	
-	local identifier = readu16(decompressed,0)
+	local identifier = buffer_readu16(decompressed,0)
 	if identifier ~= PACKED_BIT then return nil end
 	-- The ID matches our global packed_bit, so this is a valid buffer.
 
-	local capacity = readu32(decompressed, PACKED_CAPACITY_OFFSET)
-	local maxCapacity = readu32(decompressed, PACKED_MAX_CAPACITY_OFFSET)
-	local length = readu32(decompressed, PACKED_LENGTH_OFFSET)
+	local capacity = buffer_readu32(decompressed, PACKED_CAPACITY_OFFSET)
+	local maxCapacity = buffer_readu32(decompressed, PACKED_MAX_CAPACITY_OFFSET)
+	local length = buffer_readu32(decompressed, PACKED_LENGTH_OFFSET)
 	
 	-- More if statements to block garbage buffers
 	if length > capacity then return nil end
 	if capacity > maxCapacity then return nil end
-	if HEADER_SIZE + length > bufferlen(decompressed) then return nil end
+	if HEADER_SIZE + length > buffer_len(decompressed) then return nil end
 
 	local self = setmetatable({
-		_Buffer = create(capacity),
+		_Buffer = buffer_create(capacity),
 		_Capacity = capacity,
 		_MaxCapacity = maxCapacity,
 		_Length = length,
 	}, StringBuilderMeta)
 	
 	-- Copy data after the header into the new StringBuilder
-	copy(self._Buffer, 0, decompressed, HEADER_SIZE, length)
+	buffer_copy(self._Buffer, 0, decompressed, HEADER_SIZE, length)
 
 	return self
 end
 
 --[[
-    Compresses the internal string buffer with the default compression algorithm
-    Default CompressionLevel is at the top of the module
-    CompressionLevel must range from (-7 to 22)
-    Higher CompressionLevel = more compression at the cost of performance
-    Returns a packed and compressed buffer
+    Compresses the StringBuilder with the default compression algorithm
+    Higher CompressionLevel = more compression at the cost of more time
+    CompressionLevel is optional and must range from (-7 to 22)
+    Returns a packed and compressed StringBuilder (as a buffer)
 ]]
-function StringBuilder.Compress(self: StringBuilder, CompressionLevel: number): buffer
+function StringBuilder.Compress(self: StringBuilder, CompressionLevel: number?): buffer
 	local packed = StringBuilder.Pack(self)
 	local compressed = EncodingService:CompressBuffer(packed, COMPRESSION_ALGORITHM, CompressionLevel or COMPRESSION_LEVEL)
 	-- Lets not return a bigger buffer than the original
-	if bufferlen(compressed) < bufferlen(packed) then
+	if buffer_len(compressed) < buffer_len(packed) then
 		return compressed
 	else
 		return packed
@@ -330,36 +338,36 @@ function StringBuilder.Compare(self: StringBuilder, self2: StringBuilder): boole
 	local length = self._Length
 	if length ~= self2._Length then return false end
 	if self == self2 then return true end
-
+	
 	local buf1 = self._Buffer
 	local buf2 = self2._Buffer
 	local cursor = 0
-
-	-- Tier 1
-	local u32_Limit = length // 4
+	
+	-- Tier 1 (Fastest - reading 4 bytes at a time)
+	local u32_Limit = length // 4 -- ( "//" op divides and rounds down )
 	for _ = 1, u32_Limit do
-		if buffer.readu32(buf1, cursor) ~= buffer.readu32(buf2, cursor) then 
+		if buffer_readu32(buf1, cursor) ~= buffer_readu32(buf2, cursor) then 
 			return false 
 		end
 		cursor += 4
 	end
-
-	-- Tier 2
+	-- Tier 2 (Slower - reading 2 bytes at a time)
 	if (length - cursor) >= 2 then
-		if buffer.readu16(buf1, cursor) ~= buffer.readu16(buf2, cursor) then
+		if buffer_readu16(buf1, cursor) ~= buffer_readu16(buf2, cursor) then
 			return false
 		end
 		cursor += 2
 	end
-	-- Tier 3
+	-- Tier 3 (Slowest - reading 1 byte at a time)
 	if (length - cursor) == 1 then
-		if buffer.readu8(buf1, cursor) ~= buffer.readu8(buf2, cursor) then
+		if buffer_readu8(buf1, cursor) ~= buffer_readu8(buf2, cursor) then
 			return false
 		end
 	end
 	
 	return true
 end
+
 --[[
     Get specific character(s) starting from index
     By default, returns a single character at the given index.
@@ -373,13 +381,13 @@ function StringBuilder.GetCharacters(self: StringBuilder, Index: number, Count: 
 	local Count = if not Count or Count == 0 then 1 else Count
 	local Length = self._Length
 	
-	local index_a, index_b = clamp(Index, 0, Length), clamp(Index + Count, 0, Length)
+	local index_a, index_b = math_clamp(Index, 0, Length), math_clamp(Index + Count, 0, Length)
 
-	local start, finish = min(index_a, index_b), max(index_a, index_b)
+	local start, finish = math_min(index_a, index_b), math_max(index_a, index_b)
 	local size = finish - start
 
 	if size > 0 then
-		return readstring(self._Buffer, start, size)
+		return buffer_readstring(self._Buffer, start, size)
 	else 
 		return ""
 	end
@@ -404,7 +412,7 @@ function StringBuilder.SetCharacters(self: StringBuilder, Index: number, Data: a
 		ResizeBuffer(self, NewLength)
 	end
 	
-	writestring(self._Buffer,Index,strData,Count)
+	buffer_writestring(self._Buffer,Index,strData,Count)
 	
 	if NewLength > self._Length then
 		self._Length = NewLength
@@ -422,13 +430,13 @@ function StringBuilder.EnsureCapacity(self: StringBuilder, EnsuredCapacity: numb
 	local CurrentCapacity = self._Capacity
 	if CurrentCapacity >= EnsuredCapacity then return true, CurrentCapacity end
 
-	local newSize = min( max(CurrentCapacity * 2, EnsuredCapacity), self._MaxCapacity )
+	local newSize = math_min( math_max(CurrentCapacity * 2, EnsuredCapacity), self._MaxCapacity )
 
 	if CurrentCapacity == newSize then return false, CurrentCapacity end
 
-	local newBuffer = create(newSize)
+	local newBuffer = buffer_create(newSize)
 
-	copy(newBuffer, 0, self._Buffer, 0, CurrentCapacity)
+	buffer_copy(newBuffer, 0, self._Buffer, 0, CurrentCapacity)
 
 	self._Buffer = newBuffer
 	self._Capacity = newSize
@@ -444,17 +452,17 @@ end
 function StringBuilder.SetCapacity(self: StringBuilder, Capacity: number): number
 	if not Capacity then return self._Capacity end
 
-	Capacity = floor(Capacity)
-	Capacity = clamp(Capacity, MIN_CAPACITY, MAX_ROBLOX_BUFFER_SIZE)
-	Capacity = min(Capacity, self._MaxCapacity)
+	Capacity = math_floor(Capacity)
+	Capacity = math_clamp(Capacity, MIN_CAPACITY, MAX_ROBLOX_BUFFER_SIZE)
+	Capacity = math_min(Capacity, self._MaxCapacity)
 
 	if self._Capacity == Capacity then return Capacity end
 
 	local oldBuf = self._Buffer
-	local newBuffer = create(Capacity)
+	local newBuffer = buffer_create(Capacity)
 
-	local copyCount = min(self._Length, Capacity)
-	copy(newBuffer, 0, oldBuf, 0, copyCount)
+	local copyCount = math_min(self._Length, Capacity)
+	buffer_copy(newBuffer, 0, oldBuf, 0, copyCount)
 
 	self._Buffer = newBuffer
 	self._Capacity = Capacity
@@ -474,7 +482,7 @@ function StringBuilder.SetMaxCapacity(self: StringBuilder, MaxCapacity: number)
 		MaxCapacity = MAX_ROBLOX_BUFFER_SIZE
 	end
 	-- Floor in case it isnt an integer
-	self._MaxCapacity = floor(MaxCapacity)
+	self._MaxCapacity = math_floor(MaxCapacity)
 end
 
 -- Returns the current length of the string in bytes
@@ -490,7 +498,7 @@ end
 ]]
 function StringBuilder.SetLength(self: StringBuilder, Length: number): boolean
 	if Length < 0 then return false end
-	Length = min(floor(Length), self._MaxCapacity)
+	Length = math_min(math_floor(Length), self._MaxCapacity)
 
 	-- a,b comparison is faster than a function call
 	if Length > self._Capacity then
@@ -519,7 +527,7 @@ function StringBuilder.Append(self: StringBuilder, Data: any): StringBuilder
 		ResizeBuffer(self, newLength)
 	end
 
-	writestring(self._Buffer, currentLength, strData, dataSize)
+	buffer_writestring(self._Buffer, currentLength, strData, dataSize)
 	self._Length = newLength
 
 	return self
@@ -530,8 +538,8 @@ end
     (appends and creates a new line using "\n")
 ]]
 function StringBuilder.AppendLine(self: StringBuilder, Data: any?): StringBuilder
-	self:Append(Data)
-	self:Newline()
+	StringBuilder.Append(self,Data)
+	StringBuilder.Newline(self)
 	return self
 end
 
@@ -540,7 +548,7 @@ end
 ]]
 function StringBuilder.AppendFormat(self: StringBuilder, Format: string, ...): StringBuilder
 	if Format then
-		local Data = format(Format, ...)
+		local Data = string_format(Format, ...)
 		StringBuilder.Append(self, Data)
 	end
 	return self
@@ -552,7 +560,7 @@ end
     Will error if anything else is provided (and not return self as a result)
 ]]
 function StringBuilder.AppendList(self: StringBuilder, ...): StringBuilder
-	local str = concat({...})
+	local str = table_concat({...})
 	local len = #str
 	if len == 0 then return self end
 	
@@ -563,17 +571,17 @@ function StringBuilder.AppendList(self: StringBuilder, ...): StringBuilder
 		ResizeBuffer(self, newPos)
 	end
 
-	writestring(self._Buffer, pos, str, len)
+	buffer_writestring(self._Buffer, pos, str, len)
 	self._Length = newPos
 	return self
 end
 
 --[[
-    Concatenates an array or collection of items, 
+    Concatenates an array of strings and numbers, 
     placing a specific separator between each one (like commas).
 ]]
-function StringBuilder.AppendJoin(self: StringBuilder, Data: {any?}, Sep: string?): StringBuilder
-	local str = concat(Data,Sep)
+function StringBuilder.AppendJoin(self: StringBuilder, Data: {any?}, Separator: string?): StringBuilder
+	local str = table_concat(Data,Separator)
 	local len = #str
 	local pos = self._Length
 	local newPos = pos + len
@@ -582,7 +590,7 @@ function StringBuilder.AppendJoin(self: StringBuilder, Data: {any?}, Sep: string
 		ResizeBuffer(self, newPos)
 	end
 
-	writestring(self._Buffer, pos, str, len)
+	buffer_writestring(self._Buffer, pos, str, len)
 	self._Length = newPos
 	return self
 end
@@ -594,20 +602,20 @@ function StringBuilder.Remove(self: StringBuilder, Index: number, Count: number)
 	if not Index then return self end
 	if not Count or Count <= 0 then return self end
 
-	Index = floor(Index)
-	Count = floor(Count)
+	Index = math_floor(Index)
+	Count = math_floor(Count)
 
 	if Index < 0 or Index >= self._Length then return self end
 
 	-- So we dont try to remove more characters than exist after the index
-	local actualCount = min(Count, self._Length - Index)
+	local actualCount = math_min(Count, self._Length - Index)
 
 	local moveSource = Index + actualCount
 	local bytesToMove = self._Length - moveSource
 
 	if bytesToMove > 0 then
 		-- We shift the buffer down
-		copy(self._Buffer, Index, self._Buffer, moveSource, bytesToMove)
+		buffer_copy(self._Buffer, Index, self._Buffer, moveSource, bytesToMove)
 	end
 
 	self._Length -= actualCount
@@ -626,17 +634,17 @@ function StringBuilder.ReverseBytes(self: StringBuilder): StringBuilder
 	if length <= 1 then return self end
 
 	-- Iterate half-way
-	for i = 0, floor(length * 0.5) - 1 do
+	for i = 0, math_floor(length * 0.5) - 1 do
 		local leftIndex = i
 		local rightIndex = length - 1 - i
 
 		-- Read bytes
-		local leftByte = readu8(self._Buffer, leftIndex)
-		local rightByte = readu8(self._Buffer, rightIndex)
+		local leftByte = buffer_readu8(self._Buffer, leftIndex)
+		local rightByte = buffer_readu8(self._Buffer, rightIndex)
 
 		-- Swap them
-		writeu8(self._Buffer, leftIndex, rightByte)
-		writeu8(self._Buffer, rightIndex, leftByte)
+		buffer_writeu8(self._Buffer, leftIndex, rightByte)
+		buffer_writeu8(self._Buffer, rightIndex, leftByte)
 	end
 
 	return self
@@ -650,19 +658,19 @@ function StringBuilder.Reverse(self: StringBuilder): StringBuilder
 	local length = self._Length
 	if length <= 1 then return self end
 
-	local baseString = readstring(self._Buffer, 0, length)
+	local baseString = buffer_readstring(self._Buffer, 0, length)
 	local graphemes = {}
 
 	-- Collect all characters
 	for start, stop in utf8.graphemes(baseString) do
-		insert(graphemes, sub(baseString, start, stop))
+		table_insert(graphemes, string_sub(baseString, start, stop))
 	end
 
 	-- Write them in reverse order
 	local currentPos = 0
 	for i = #graphemes, 1, -1 do
 		local char = graphemes[i]
-		writestring(self._Buffer, currentPos, char)
+		buffer_writestring(self._Buffer, currentPos, char)
 		currentPos += #char
 	end
 
@@ -674,7 +682,7 @@ end
 ]]
 function StringBuilder.Insert(self: StringBuilder, Index: number, Data: any): StringBuilder
 	if not Index then return self end
-	Index = floor(Index)
+	Index = math_floor(Index)
 	if Index < 0 then return self end
 	if Index > self._Length then return self end
 
@@ -683,7 +691,7 @@ function StringBuilder.Insert(self: StringBuilder, Index: number, Data: any): St
 	if not Data or Data == "" then return self end
 	
 	-- Clamp Index so theres no gaps
-	Index = min(Index, self._Length)
+	Index = math_min(Index, self._Length)
 
 
 	local DataSize = #Data
@@ -703,10 +711,10 @@ function StringBuilder.Insert(self: StringBuilder, Index: number, Data: any): St
 
 	local bytesToMove = self._Length - Index
 	if bytesToMove > 0 then
-		copy(self._Buffer, Index + DataSize, self._Buffer, Index, bytesToMove)
+		buffer_copy(self._Buffer, Index + DataSize, self._Buffer, Index, bytesToMove)
 	end
 	-- Write the new text (clamped by DataSize)
-	writestring(self._Buffer, Index, Data, DataSize)
+	buffer_writestring(self._Buffer, Index, Data, DataSize)
 
 	self._Length = newLength
 
@@ -725,14 +733,14 @@ function StringBuilder.Replace(self: StringBuilder, Target: string, Replacement:
 	local delta = replacementSize - targetSize
 
 	-- Read the buffer once to find our match indices
-	local baseString = readstring(self._Buffer, 0, self._Length)
+	local baseString = buffer_readstring(self._Buffer, 0, self._Length)
 
 	local searchIndex = 1
 	local currentOffset = 0
 
 	while true do
 		-- Plain search
-		local startIdx, endIdx = find(baseString, Target, searchIndex, true)
+		local startIdx, endIdx = string_find(baseString, Target, searchIndex, true)
 		if not startIdx or not endIdx then break end
 
 		-- string.find is 1> indexed, buffers are 0> indexed.
@@ -741,7 +749,7 @@ function StringBuilder.Replace(self: StringBuilder, Target: string, Replacement:
 
 		if delta == 0 then
 			-- If lengths are identical just overwrite the bytes directly
-			writestring(self._Buffer, adjustedIndex, Replacement)
+			buffer_writestring(self._Buffer, adjustedIndex, Replacement)
 		else
 			local moveSource = adjustedIndex + targetSize
 			local moveDest = adjustedIndex + replacementSize
@@ -754,11 +762,11 @@ function StringBuilder.Replace(self: StringBuilder, Target: string, Replacement:
 
 			-- Shift the remaining data
 			if bytesToMove > 0 then
-				copy(self._Buffer, moveDest, self._Buffer, moveSource, bytesToMove)
+				buffer_copy(self._Buffer, moveDest, self._Buffer, moveSource, bytesToMove)
 			end
 
 			-- Write the new replacement string into the gap
-			writestring(self._Buffer, adjustedIndex, Replacement)
+			buffer_writestring(self._Buffer, adjustedIndex, Replacement)
 
 			self._Length += delta
 			currentOffset += delta
@@ -779,7 +787,7 @@ function StringBuilder.Space(self: StringBuilder): StringBuilder
 	if newPos > self._Capacity then
 		ResizeBuffer(self, newPos)
 	end
-	writeu8(self._Buffer,pos,32) -- 32 is a space " "
+	buffer_writeu8(self._Buffer,pos,BUF_SPACE)
 	self._Length = newPos
 	return self
 end
@@ -793,7 +801,7 @@ function StringBuilder.Newline(self: StringBuilder): StringBuilder
 	if newPos > self._Capacity then
 		ResizeBuffer(self, newPos)
 	end
-	writeu8(self._Buffer,pos,10) -- 10 is \n
+	buffer_writeu8(self._Buffer,pos,BUF_NEWLINE)
 	self._Length = newPos
 	return self
 end
@@ -802,7 +810,7 @@ end
 	Returns the fully built string.
 ]]
 function StringBuilder.ToString(self: StringBuilder): string
-	return readstring(self._Buffer,0,self._Length)
+	return buffer_readstring(self._Buffer,0,self._Length)
 end
 
 --[[
@@ -820,7 +828,7 @@ end
 function StringBuilder.Destroy(self: StringBuilder)
 	-- Leaves the Buffer to be cleaned up by the gc automatically.
 	-- (Theres no way to do it manually).
-	table.clear(self)
+	table_clear(self)
 	setmetatable(self,nil)
 end
 
@@ -832,7 +840,7 @@ end
 	Instead of StringBuilder:tostring() or StringBuilder.tostring(builder)
 ]]
 function StringBuilderMeta.__tostring(self: StringBuilder): string
-	return readstring(self._Buffer,0,self._Length)
+	return buffer_readstring(self._Buffer,0,self._Length)
 end
 
 
