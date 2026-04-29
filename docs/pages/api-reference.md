@@ -44,17 +44,17 @@ Same as `Append`, except with formatting built-in!
 
 ### `AppendJoin`
 ```lua
-StringBuilder:AppendJoin(Data: {any?}, Sep: string?): StringBuilder
+StringBuilder:AppendJoin(Data: {any?}, Separator: string?): StringBuilder
 ```
-Takes an array of items and strings them together, throwing your `Sep` string right between each one (like commas).
-!!! warning "As this uses `table.concat`, it will error if you pass anything other than strings or numbers!"
+Concatenates and appends an array of string & numbers, placing your `Separator` right between each one (like commas).
+!!! warning "As this uses `table.concat`, it will error if you pass anything other than strings and numbers!"
 
 ### `AppendList`
 ```lua
 StringBuilder:AppendList(...): StringBuilder
 ```
-Concatenates and appends any number of string or number arguments. Way faster than chaining appends together!
-!!! warning "As this uses `table.concat`, it will error if you pass anything other than strings or numbers!"
+Concatenates and appends a list of string and/or number arguments. Way faster than chaining appends together!
+!!! warning "As this uses `table.concat`, it will error if you pass anything other than strings and numbers!"
 
 ### `Compare`
 ```lua
@@ -219,10 +219,10 @@ Packs the StringBuilder's data and metadata all together into a buffer!
 
 ### `Compress`
 ```lua
-StringBuilder:Compress(CompressionLevel: number): buffer
+StringBuilder:Compress(CompressionLevel: number?): buffer
 ```
 Compresses the StringBuilder with Zstd 
-`CompressionLevel` goes from `-7 to 22`: higher means more compression at the cost of performance. Returns a packed and compressed buffer.
+`CompressionLevel` is optional and must range from `-7 to 22`: higher means more compression at the cost of more time. Returns a packed and compressed buffer.
 
 ### `FromBuffer`
 ```lua
