@@ -1,6 +1,6 @@
 {
   "name": "StringBuilder",
   "tree": {
-    "$path": "src/init.luau"
+    "$path": "src/"
   }
 }
