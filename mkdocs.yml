@@ -1,0 +1,65 @@
+site_name: StringBuilder
+site_url: https://ghoste0001.github.io/StringBuilder-Roblox/
+repo_url: https://github.com/ghoste0001/StringBuilder-Roblox
+remote_branch: gh-pages
+
+extra_css:
+  - css/extra.css
+
+nav:
+  - Home: index.md
+  - Getting Started: pages/getting-started.md
+  - API Reference: pages/api-reference.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      
+markdown_extensions:
+  - attr_list
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  
+theme:
+  name: material
+  logo: icon.png
+  favicon: icon.png
+  font:
+    text: Inter
+    code: JetBrains Mono
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
+    admonition:
+      note: fontawesome/solid/note-sticky
+      abstract: fontawesome/solid/book
+      info: fontawesome/solid/circle-info
+      tip: fontawesome/solid/bullhorn
+      success: fontawesome/solid/check
+      question: fontawesome/solid/circle-question
+      warning: fontawesome/solid/triangle-exclamation
+      failure: fontawesome/solid/bomb
+      danger: fontawesome/solid/skull
+      bug: fontawesome/solid/robot
+      example: fontawesome/solid/flask
+      quote: fontawesome/solid/quote-left
+  features:
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - content.code.copy
+    - content.tooltips
+    - header.autohide
+  palette:
+    primary: deep purple
+    scheme: slate
