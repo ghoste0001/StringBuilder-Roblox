@@ -2,6 +2,9 @@ name: Manual Release (Source Code Version Tag)
 
 on:
   workflow_dispatch:
+  push:
+    branches: main
+    paths: src/
 
 jobs:
   create_release:
@@ -54,7 +57,6 @@ jobs:
           name: StringBuilder ${{ env.VERSION }}
           generate_release_notes: true
           files: |
-            StringBuilder.luau
             StringBuilder.rbxm
           draft: false
           prerelease: false
