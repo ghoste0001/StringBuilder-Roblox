@@ -119,7 +119,6 @@ const PRINT_PREFIX = "[StringBuilder]: "
 
 const builtin_error = error
 const function error(message: any) builtin_error(PRINT_PREFIX..message, ERROR_LEVEL); end
-const function errorfmt(format: string, ...) builtin_error(PRINT_PREFIX..string.format(format,...), ERROR_LEVEL); end
 -------------------------------------------
 
 
@@ -139,11 +138,7 @@ local function ResizeBuffer(self: StringBuilder, newLength: number)
 	targetCapacity = math.min(targetCapacity, self._MaxCapacity)
 
 	if targetCapacity < newLength then
-		errorfmt(
-			"buffer resize failed. requested=%d, max=%d",
-			newLength,
-			self._MaxCapacity
-		)
+		error("buffer resize failed. requested="..newLength..", max="..self._MaxCapacity)
 	end
 
 	local oldBuf = self._Buffer
