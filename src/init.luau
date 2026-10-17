@@ -768,6 +768,79 @@ function StringBuilder.Insert(self: StringBuilder, Index: number, Data: any): St
 end
 
 --[[
+	Looks for the first match of target in the StringBuilder
+	returns the indices of the string where the occurrence starts and ends.
+]]
+function StringBuilder.Find(self: StringBuilder, target: string, start: number?): (number?, number?)
+	const targetLength = #target
+	if targetLength == 0 then return nil end
+	const length = self._Length
+	const buf = self._Buffer
+
+	local pbytes = table.create(targetLength)
+	for i = 0, targetLength - 1 do
+		pbytes[i] = string.byte(target, i + 1)
+	end
+
+	if targetLength == 1 then
+		local byte = pbytes[0]
+		for i = math.max(0, start or 0), length - 1 do
+			if buffer.readu8(buf, i) == byte then
+				return i, i + 1
+			end
+		end
+		return nil
+	elseif targetLength == 2 then
+		local b0, b1 = pbytes[0], pbytes[1]
+		local limit = length - 2
+		for i = math.max(0, start or 0), limit do
+			if buffer.readu8(buf, i) == b0
+				and buffer.readu8(buf, i + 1) == b1 then
+				return i, i + 2
+			end
+		end
+		return nil
+	end
+
+	local lps = table.create(targetLength, 0)
+	local len = 0
+	local i = 1
+
+	while i < targetLength do
+		if pbytes[i] == pbytes[len] then
+			len += 1
+			lps[i + 1] = len
+			i += 1
+		elseif len ~= 0 then
+			len = lps[len]
+		else
+			lps[i + 1] = 0
+			i += 1
+		end
+	end
+
+	i = math.max(0, start or 0)
+	local j = 0
+
+	while i < length do
+		if pbytes[j] == buffer.readu8(buf, i) then
+			i += 1
+			j += 1
+			if j == targetLength then
+				local startIdx = i - j
+				return startIdx, startIdx + targetLength
+			end
+		elseif j ~= 0 then
+			j = lps[j]
+		else
+			i += 1
+		end
+	end
+
+	return nil
+end
+
+--[[
 	Replaces all occurences of [Target] with [Replacement].
 ]]
 function StringBuilder.Replace(self: StringBuilder, search: string, replacement: string): StringBuilder
