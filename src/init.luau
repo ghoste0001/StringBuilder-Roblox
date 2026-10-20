@@ -129,9 +129,7 @@ const function error(message: any) builtin_error(PRINT_PREFIX..message, ERROR_LE
 local function ResizeBuffer(self: StringBuilder, newLength: number)
 	local currentCapacity = self._Capacity
 
-	if newLength <= currentCapacity then 
-		return true 
-	end
+	if newLength <= currentCapacity then return true end
 
 	local targetCapacity = math.max(currentCapacity * 2, newLength + DEFAULT_CAPACITY)
 
@@ -160,14 +158,12 @@ end
 function StringBuilder.new(Capacity: number?, MaxCapacity: number?): StringBuilder
 	Capacity = Capacity or DEFAULT_CAPACITY
 	MaxCapacity = MaxCapacity or DEFAULT_MAX_CAPACITY
-	local n = math.floor(Capacity)
-	if n ~= Capacity then
-		error("new: Capacity is not a whole number!")
-	end
-	n = math.floor(MaxCapacity)
-	if n ~= MaxCapacity then
-		error("new: MaxCapacity is not a whole number!")
-	end
+	if Capacity % 1 ~= 0 then
+        error("new: invalid Capacity")
+    end
+	if MaxCapacity % 1 ~= 0 then
+        error("new: invalid MaxCapacity")
+    end
 	Capacity = math.max(MIN_CAPACITY, Capacity)
 	MaxCapacity = math.max(MIN_MAX_CAPACITY, Capacity, MaxCapacity)
 
@@ -430,14 +426,14 @@ end
     Returns: success, capacity
 ]]
 function StringBuilder.EnsureCapacity(self: StringBuilder, EnsuredCapacity: number): (boolean, number)
-	local n = math.floor(EnsuredCapacity)
-	if n ~= EnsuredCapacity then
-		error("EnsureCapacity: EnsuredCapacity is not a whole number!")
-	end
-	n = math.clamp(EnsuredCapacity, 0, self._MaxCapacity)
-	local success = pcall(ResizeBuffer, self, n)
 
-	return success and EnsuredCapacity <= n, self._Capacity
+	if EnsuredCapacity % 1 ~= 0 then
+        error("EnsureCapacity: invalid EnsuredCapacity")
+    end
+	local newCapacity = math.clamp(EnsuredCapacity, 0, self._MaxCapacity)
+	local success = pcall(ResizeBuffer, self, newCapacity)
+
+	return success and EnsuredCapacity <= newCapacity, self._Capacity
 end
 
 --[[
@@ -448,10 +444,9 @@ end
 function StringBuilder.SetCapacity(self: StringBuilder, Capacity: number): number
 	if not Capacity then return self._Capacity end
 
-	local n = math.floor(Capacity)
-	if n ~= Capacity then
-		error("SetCapacity: Capacity is not a whole number!")
-	end
+	if Capacity % 1 ~= 0 then
+        error("SetCapacity: invalid Capacity")
+    end
 	Capacity = math.clamp(Capacity, MIN_CAPACITY, MAX_SB_BUFFER_SIZE)
 	Capacity = math.min(Capacity, self._MaxCapacity)
 
@@ -474,11 +469,9 @@ end
 	Throws an error if MaxCapacity is less than self._Capacity.
 ]]
 function StringBuilder.SetMaxCapacity(self: StringBuilder, MaxCapacity: number)
-	if not MaxCapacity then return end
-	local n = math.floor(MaxCapacity)
-	if n ~= MaxCapacity then
-		error("SetMaxCapacity: MaxCapacity is not a whole number!")
-	end
+	if not MaxCapacity or MaxCapacity % 1 ~= 0 then
+        error("SetMaxCapacity: invalid MaxCapacity")
+    end
 	if MaxCapacity < self._Capacity then
 		error("SetMaxCapacity: MaxCapacity cant be less than Capacity!")
 	end
@@ -499,19 +492,11 @@ end
     If smaller, it instantly truncates the string.
     If larger than (self._Capacity), it forces a buffer expansion.
     Returns self.
-	Throws an error if passed length is higher than MaxCapacity or not a whole number.
+	Throws an error if passed length is higher than MaxCapacity, or not a whole number.
 ]]
 function StringBuilder.SetLength(self: StringBuilder, Length: number): StringBuilder
-	if Length < 0 then
-		error("SetLength: Length cant be less than than 0!")
-	end
-	local n = math.floor(Length)
-	if n ~= Length then
-		error("SetLength: Length is not a whole number!")
-	end
-	Length = n
-	if Length > self._MaxCapacity then
-		error("SetLength: Length cant be more than MaxCapacity!")
+	if not Length or Length < 0 or Length > self._MaxCapacity or Length % 1 ~= 0 then
+		error("SetLength: invalid Length")
 	end
 
 	-- a,b comparison is faster than a function call
