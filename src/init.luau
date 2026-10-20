@@ -841,66 +841,94 @@ function StringBuilder.Find(self: StringBuilder, target: string, start: number?)
 end
 
 --[[
-	Replaces all occurences of [Target] with [Replacement].
+	Replaces all occurences of [target] with [replacement] from [start].
 ]]
-function StringBuilder.Replace(self: StringBuilder, search: string, replacement: string): StringBuilder
-	if type(search) ~= "string" then error("Replace: search is not a string!") end
+function StringBuilder.Replace(self: StringBuilder, target: string, replacement: string, start: number?): StringBuilder
+	if type(target) ~= "string" then error("Replace: target is not a string!") end
 	if type(replacement) ~= "string" then error("Replace: replacement is not a string!") end
-	if search == replacement then return self end
+	if target == replacement then return self end
+
 	local length = self._Length
-	local searchLength = #search
-	if length == 0 or searchLength == 0 then return self end
-	local baseString = buffer.readstring(self._Buffer, 0, length)
-	local starts = table.create(16) :: {number}
+	local targetLength = #target
+	if length == 0 or targetLength == 0 then return self end
+
+	local lps = table.create(targetLength, 0)
+	local pbytes = table.create(targetLength)
+	for i = 0, targetLength - 1 do
+		pbytes[i] = string.byte(target, i + 1)
+	end
+
+	local buf = self._Buffer
+	local starts = {}
 	local count = 0
-	local cursor = 1
+	local len = 0
+	local i = 1
+	local j = 0
 
-	while true do
-		local startPos = string.find(baseString, search, cursor, true)
-		if not startPos then break end
+	while i < targetLength do
+		if pbytes[i] == pbytes[len] then
+			len += 1
+			lps[i + 1] = len
+			i += 1
+		elseif len ~= 0 then
+			len = lps[len]
+		else
+			lps[i + 1] = 0
+			i += 1
+		end
+	end
 
-		count += 1
-		starts[count] = startPos - 1
-		cursor = startPos + searchLength
+	i = 0
+	while i < length do
+		if pbytes[j] == buffer.readu8(buf, i) then
+			i += 1
+			j += 1
+			if j == targetLength then
+				count += 1
+				starts[count] = i - targetLength
+				j = 0
+			end
+		elseif j ~= 0 then
+			j = lps[j]
+		else
+			i += 1
+		end
 	end
 
 	if count == 0 then return self end
 
 	local replacementLength = #replacement
-	local newLength = length + count * (replacementLength - searchLength)
-
-	if newLength > self._Capacity then
-		ResizeBuffer(self, newLength)
-	end
-
-	local newBuf = buffer.create(self._Capacity)
+	local newLength = length + count * (replacementLength - targetLength)
+	local newCapacity = math.max(newLength, self._Capacity)
+	local destBuf = buffer.create(newCapacity)
 	local readCursor = 0
 	local writeCursor = 0
 
-	for i = 1, count do
-		local startPos = starts[i]
+	for idxCount = 1, count do
+		local startPos = starts[idxCount]
 		local segmentLength = startPos - readCursor
 
 		if segmentLength > 0 then
-			buffer.copy(newBuf, writeCursor, self._Buffer, readCursor, segmentLength)
+			buffer.copy(destBuf, writeCursor, buf, readCursor, segmentLength)
 			writeCursor += segmentLength
 		end
 
 		if replacementLength > 0 then
-			buffer.writestring(newBuf, writeCursor, replacement, replacementLength)
+			buffer.writestring(destBuf, writeCursor, replacement, replacementLength)
 			writeCursor += replacementLength
 		end
 
-		readCursor = startPos + searchLength
+		readCursor = startPos + targetLength
 	end
 
 	local remaining = length - readCursor
 	if remaining > 0 then
-		buffer.copy(newBuf, writeCursor, self._Buffer, readCursor, remaining)
+		buffer.copy(destBuf, writeCursor, buf, readCursor, remaining)
 	end
 
-	self._Buffer = newBuf
+	self._Buffer = destBuf
 	self._Length = newLength
+	self._Capacity = newCapacity
 
 	return self
 end
