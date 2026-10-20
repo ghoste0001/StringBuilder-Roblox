@@ -20,6 +20,8 @@ Returns a brand new `StringBuilder` object.
 - **Capacity**: *(Optional)* The starting size in bytes. Defaults to `64`.
 - **MaxCapacity**: *(Optional)* Absolute max capacity in bytes. Defaults to `4*1024*1024` (4MB).
 
+Both capacities must be whole numbers. `Capacity` is clamped to the supported buffer-size range, and `MaxCapacity` is adjusted to be at least as large as `Capacity`.
+
 ---
 
 ## Modification
@@ -28,7 +30,7 @@ Returns a brand new `StringBuilder` object.
 ```lua
 StringBuilder:Append(Data: any?): StringBuilder
 ```
-Appends data (string, number, bool) at the end!
+Appends data at the end! Automatically converts non-string values to strings. Passing `nil` does nothing.
 
 ### `AppendLine`
 ```lua
@@ -46,14 +48,14 @@ Same as `Append`, except with formatting built-in!
 ```lua
 StringBuilder:AppendJoin(Data: {any?}, Separator: string?): StringBuilder
 ```
-Concatenates and appends an array of string & numbers, placing your `Separator` right between each one (like commas).
+Concatenates and appends an array of strings and/or numbers, placing your `Separator` right between each one (like commas).
 !!! warning "As this uses `table.concat`, it will error if you pass anything other than strings and numbers!"
 
 ### `AppendList`
 ```lua
 StringBuilder:AppendList(...): StringBuilder
 ```
-Concatenates and appends a list of string and/or number arguments. Way faster than chaining appends together!
+Concatenates and appends a list of string and/or number arguments. Way faster than chaining appends together for building strings!
 !!! warning "As this uses `table.concat`, it will error if you pass anything other than strings and numbers!"
 
 ### `Compare`
@@ -62,46 +64,60 @@ StringBuilder:Compare(self2: StringBuilder): boolean
 ```
 Compares this StringBuilder with another one and returns `true` if their contents are fully identical!
 
-*(Note: You can also use the native `==` operator directly between two StringBuilders thanks to `__eq` metamethod support).*
+*(Note: You can also use the native `==` operator directly between two StringBuilders thanks to `__eq` metamethod support.)*
 
 ### `GetCharacters`
 ```lua
 StringBuilder:GetCharacters(Index: number, Count: number?): string
 ```
-Grabs specific character(s) starting from your given `Index`. `Count` defaults to 1, but you can pass negative or positive numbers to grab more (negative values dont return reversed strings).
+Grabs specific bytes starting from your given zero-based `Index`. `Count` defaults to `1`, but you can pass negative or positive numbers to grab more. Negative values don't return reversed strings; they just read the range in the opposite direction.
+
+Throws an error if the requested range is out of bounds or either value isn't a whole number. A `Count` of `0` returns an empty string.
 
 ### `SetCharacters`
 ```lua
 StringBuilder:SetCharacters(Index: number, Data: any): StringBuilder
 ```
-Overwrites any character(s) starting at your `Index` directly with the new `Data`!
-Gaps created past the old length are automatically zero-filled.
+Overwrites bytes starting at your `Index` directly with the new `Data`!
+
+If the new data extends past the old length, the builder grows automatically. Gaps created past the old length are automatically zero-filled.
 
 ### `Insert`
 ```lua
-StringBuilder:Insert(Data: any?, Index: number): StringBuilder
+StringBuilder:Insert(Index: number, Data: any): StringBuilder
 ```
-Inserts your `Data` right at the given `Index` and safely pushes everything else to the right.
-Throws an error if there is insufficient max capacity or space.
+Inserts your `Data` right at the given zero-based byte `Index` and safely pushes everything else to the right.
+
+Throws an error if the index is invalid or there isn't enough available max capacity for the data to fit.
+
+Passing `nil` or an empty string leaves the builder unchanged.
 
 ### `Replace`
 ```lua
-StringBuilder:Replace(Target: string, Replacement: string): StringBuilder
+StringBuilder:Replace(Target: string, Replacement: string, Start: number?): StringBuilder
 ```
-Replaces all occurrences of `Target` with `Replacement`.
+Replaces all non-overlapping occurrences of `Target` with `Replacement`, starting from the optional zero-based `Start` index (defaults to `0`).
+
+Anything before `Start` stays untouched!
+
+Throws an error if `Target` or `Replacement` isn't a string, `Start` is invalid, or the resulting string exceeds your `MaxCapacity`.
+
+Passing an empty `Target` leaves the builder unchanged.
 
 ### `Remove`
 ```lua
-StringBuilder:Remove(Index: number, Count: number): StringBuilder
+StringBuilder:Remove(Index: number, Count: number?): StringBuilder
 ```
-Chops exactly `Count` amount of letters right out of the string starting from `Index`.
+Chops exactly `Count` bytes right out of the string starting from `Index`. `Count` defaults to `1`.
+
+Throws an error if `Index` is invalid, `Count` is negative or isn't a whole number, or the requested range extends beyond the current length.
 
 ### `Reverse`
 ```lua
 StringBuilder:Reverse(): StringBuilder
 ```
 Reverses the string safely using `utf8.graphemes`. This is the default because it fully supports emojis and multi-language strings!
-*(Note: It's slower than `ReverseBytes()`)*
+*(Note: It's slower than `ReverseBytes()`.)*
 
 ### `ReverseBytes`
 ```lua
@@ -125,7 +141,38 @@ Just appends a newline (`"\n"`) at the end.
 ```lua
 StringBuilder:Clear(): StringBuilder
 ```
-Clears the buffer! *(More accurately, it just resets the end cursor, so it's basically free to call)*
+Clears the buffer! *(More accurately, it just resets the length, so it's basically free to call.)*
+
+---
+
+## Searching
+
+### `Find`
+```lua
+StringBuilder:Find(Target: string, Start: number?): (number?, number?)
+```
+Searches for the first occurrence of `Target`, starting at the optional zero-based `Start` index (defaults to `0`).
+
+Returns the zero-based start index and exclusive end index, or `nil` if nothing was found.
+
+An empty target returns `nil`. Throws an error if `Start` is out of bounds (<0 or self._Length) or isn't a whole number.
+
+Includes special fast cases for searching one and two-byte targets!
+
+### `FindNative`
+```lua
+StringBuilder:FindNative(Pattern: string, Start: number?, Plain: boolean?): (number?, number?)
+```
+
+A wrapper for Luau's native `string.find`.
+
+Searches from the optional zero-based `Start` index (defaults to `0`). `Plain` defaults to `true`, meaning it searches for the exact text instead of interpreting it as a Lua pattern. Set `Plain` to `false` if you want pattern matching.
+
+Returns the zero-based start index and exclusive end index, or `nil` if nothing was found.
+
+An empty pattern returns `nil`. Throws an error if `Start` is out of bounds (<0 or self._Length) or isn't a whole number.
+
+!!! warning "This converts the searched buffer range into a string first, so use it sparingly with large StringBuilders or frequent calls!"
 
 ---
 
@@ -146,8 +193,9 @@ StringBuilder:SetLength(Length: number): StringBuilder
 ```
 Manually sets the length of the string!
 - If it's smaller, it instantly truncates your string.
-- If it's larger than your current capacity, it forces a buffer expansion. Gaps are zero-filled.
-- Throws an error if the length is negative, not a whole number, or exceeds `MaxCapacity`.
+- If it's larger than your current capacity, it forces a buffer expansion.
+- Newly extended bytes are zero-filled.
+- Throws an error if the length is negative, exceeds `MaxCapacity`, or isn't a whole number.
 
 ### `GetCapacity`
 ```lua
@@ -159,14 +207,21 @@ Returns your current capacity in bytes.
 ```lua
 StringBuilder:EnsureCapacity(EnsuredCapacity: number): (boolean, number)
 ```
-Makes sure your buffer is at least as big as `EnsuredCapacity`! Returns `true` if it had to/could resize, alongside your new capacity.
-!!! warning "This is capped by your `StringBuilder`'s max capacity, so be sure to check if the returned capacity is enough!"
+Makes sure your buffer is at least as big as `EnsuredCapacity`!
+
+Returns `success, capacity`, where `success` tells you whether the requested capacity was achieved, and `capacity` is your current capacity.
+
+Throws an error if `EnsuredCapacity` is negative, exceeds `MaxCapacity`, or isn't a whole number.
+
+*(Note: `EnsureCapacity(0)` is valid and succeeds as long as the current capacity is at least `0`.)*
 
 ### `SetCapacity`
 ```lua
 StringBuilder:SetCapacity(Capacity: number): number
 ```
-Manually set the capacity safely! It resizes the buffer, and any out of bounds data just gets cut off. Returns the new actual capacity (capped by your max capacity!).
+Manually sets the capacity safely! It resizes the buffer, and any data that no longer fits gets cut off.
+
+Returns the new actual capacity, capped by your `MaxCapacity`.
 
 ### `GetMaxCapacity`
 ```lua
@@ -179,19 +234,21 @@ Returns the max capacity in bytes.
 StringBuilder:SetMaxCapacity(MaxCapacity: number)
 ```
 Manually sets your absolute max capacity.
-Throws an error if `MaxCapacity` is not a whole number or is less than your current capacity.
+Throws an error if `MaxCapacity` is less than your current capacity or isn't a whole number.
+
+The value is capped at the maximum supported buffer size.
 
 ### `GetFreeSpace`
 ```lua
 StringBuilder:GetFreeSpace(): number
 ```
-Returns your available writable space in bytes.
+Returns your available writable space in bytes (`Capacity - Length`).
 
 ### `GetTotalFreeSpace`
 ```lua
 StringBuilder:GetTotalFreeSpace(): number
 ```
-Returns your max writable space in bytes.
+Returns your total remaining writable space in bytes (`MaxCapacity - Length`).
 
 ---
 
@@ -202,7 +259,8 @@ Returns your max writable space in bytes.
 StringBuilder:ToString(): string
 ```
 Returns the fully built string!
-*(You can also just use `tostring(stringBuilder)` or `print(stringBuilder)`)*
+
+*(You can also just use `tostring(stringBuilder)` or `print(stringBuilder)`.)*
 
 ### `Destroy`
 ```lua
@@ -226,10 +284,18 @@ Packs the StringBuilder's data and metadata all together into a buffer!
 ```lua
 StringBuilder:Compress(CompressionLevel: number?): buffer
 ```
-Compresses the StringBuilder with Zstd. `CompressionLevel` is optional and must range from `-7 to 22`: higher means more compression at the cost of more time. Returns a packed and compressed buffer (or falls back safely if compression fails).
+Compresses the StringBuilder with Zstd.
+
+`CompressionLevel` is optional and ranges from `-7` to `22`. Higher levels generally mean more compression at the cost of more time.
+
+Returns a packed and compressed buffer, or falls back to the packed buffer if compression fails or the compressed result isn't smaller.
 
 ### `FromBuffer`
 ```lua
 StringBuilder.FromBuffer(data: buffer): StringBuilder?
 ```
-Returns a `StringBuilder` object right back from a compressed (or packed) StringBuilder buffer. Returns `nil` or throws descriptive validation errors if the buffer is malformed.
+Returns a `StringBuilder` object right back from a packed or compressed StringBuilder buffer.
+
+Returns `nil` if the buffer isn't recognized as a valid StringBuilder buffer or can't be decompressed. Throws descriptive validation errors if the buffer contains invalid capacity metadata.
+
+!!! warning "Only pass buffers produced by `Pack()` or `Compress()` if you want to ensure the buffer has the expected format!"
