@@ -368,33 +368,24 @@ StringBuilderMeta.__eq = StringBuilder.Compare
     (Returned string won't be reversed by a negative Count)
 ]]
 function StringBuilder.GetCharacters(self: StringBuilder, Index: number, Count: number?): string
-	if not Index or Index < 0 then
-		return ""
-	end
-
-	local n = math.floor(Index)
-	if n ~= Index then
-		error("GetCharacters: Index is not a whole number!")
-	end
-
-	Count = if not Count or Count == 0 then 1 else Count
-	n = math.floor(Count)
-	if n ~= Count then
-		error("GetCharacters: Count is not a whole number!")
-	end
-
+    Count = Count or 1
+	
+	if Index % 1 ~= 0 or Count % 1 ~= 0 then
+        error("GetCharacters: invalid Index")
+    end
+	
 	local Length = self._Length
+    local EndIndex = Index + Count
 
-	local index_a, index_b = math.clamp(Index, 0, Length), math.clamp(Index + Count, 0, Length)
+    if Index < 0 or Index > Length or EndIndex < 0 or EndIndex > Length then
+        error("GetCharacters: access out of bounds")
+    end
 
-	local start, finish = math.min(index_a, index_b), math.max(index_a, index_b)
-	local size = finish - start
+    if Count == 0 then
+        return ""
+    end
 
-	if size > 0 then
-		return buffer.readstring(self._Buffer, start, size)
-	end
-
-	return ""
+    return buffer.readstring(self._Buffer, math.min(Index, EndIndex), math.abs(Count))
 end
 
 --[[
@@ -402,15 +393,15 @@ end
     Data can be a string or any tostring convertable type
 ]]
 function StringBuilder.SetCharacters(self: StringBuilder, Index: number, Data: any): StringBuilder
-	if not Index or Data == nil or Index < 0 then
+	if not Index or Data == nil then
 		return self
 	end
-	local n = math.floor(Index)
-	if n ~= Index then
-		error("SetCharacters: Index is not a whole number!")
-	end
 	local strData = tostring(Data)
-	if not strData or strData == "" then return self end
+	if strData == "" then return self end
+
+    if Index < 0 or Index % 1 ~= 0 then
+        error("SetCharacters: invalid Index")
+    end
 
 	local Count = #strData
 	local newLength = Index+Count
@@ -429,6 +420,7 @@ function StringBuilder.SetCharacters(self: StringBuilder, Index: number, Data: a
 	if newLength > oldLength then
 		self._Length = newLength
 	end
+
 	return self
 end
 
