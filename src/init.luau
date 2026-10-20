@@ -841,6 +841,26 @@ function StringBuilder.Find(self: StringBuilder, target: string, start: number?)
 end
 
 --[[
+	Looks for the first match of target in the StringBuilder
+	returns the indices of the string where the occurrence starts and ends.
+
+	Wrapper for string.find which is way faster than Find()
+
+	Note:
+    To use string.find, this first converts the buffer into a 
+	temporary string that's (self._Length) bytes, adding to GC pressure.
+    Use sparingly with large StringBuilders or frequent calls.
+]]
+function StringBuilder.FindNative(self: StringBuilder, pattern: string, start: number?, plain: boolean?): (number?, number?)
+	local s = start or 0
+	local sIdx, eIdx = string.find(buffer.readstring(self._Buffer, s, self._Length - s), pattern, 0, plain)
+	if sIdx then
+		return sIdx + s - 1, eIdx + s - 1
+	end
+	return
+end
+
+--[[
 	Replaces all occurences of [target] with [replacement] from [start].
 ]]
 function StringBuilder.Replace(self: StringBuilder, target: string, replacement: string, start: number?): StringBuilder
