@@ -3,7 +3,7 @@
 
 --[[
 	@module: StringBuilder
-	@version: 1.1.1
+	@version: 1.2.0
 	@author: Ghost (withoutruless)
 	@description: Blazing-fast string builder library similar to C#, faster than Luau's native string concat.
 	
@@ -132,7 +132,6 @@ local function ResizeBuffer(self: StringBuilder, newLength: number)
 	if newLength <= currentCapacity then return true end
 
 	local targetCapacity = math.max(currentCapacity * 2, newLength + DEFAULT_CAPACITY)
-
 	targetCapacity = math.min(targetCapacity, self._MaxCapacity)
 
 	if targetCapacity < newLength then
@@ -159,16 +158,14 @@ function StringBuilder.new(Capacity: number?, MaxCapacity: number?): StringBuild
 	Capacity = Capacity or DEFAULT_CAPACITY
 	MaxCapacity = MaxCapacity or DEFAULT_MAX_CAPACITY
 	if Capacity % 1 ~= 0 then
-        error("new: invalid Capacity")
+        error("new: invalid Capacity!")
     end
 	if MaxCapacity % 1 ~= 0 then
-        error("new: invalid MaxCapacity")
+        error("new: invalid MaxCapacity!")
     end
-	Capacity = math.max(MIN_CAPACITY, Capacity)
+	Capacity = math.clamp(Capacity, MIN_CAPACITY, MAX_SB_BUFFER_SIZE)
 	MaxCapacity = math.max(MIN_MAX_CAPACITY, Capacity, MaxCapacity)
-
-	MaxCapacity = math.min(MaxCapacity,MAX_SB_BUFFER_SIZE)
-	Capacity = math.min(Capacity,MAX_SB_BUFFER_SIZE)
+	MaxCapacity = math.min(MaxCapacity, MAX_SB_BUFFER_SIZE)
 
 	return setmetatable({
 		_Buffer = buffer.create(Capacity),
@@ -207,22 +204,22 @@ end
 	nil if the given buffer is not a StringBuilder.
 ]]
 function StringBuilder.FromBuffer(data: buffer): StringBuilder?
-	if not data then return nil end
+	if not data then return end
 	local decompressed;
 	local compressedLength = EncodingService:GetDecompressedBufferSize(data, COMPRESSION_ALGORITHM)
 	if not compressedLength then
 		decompressed = data
 	else
 		local success, newdata = pcall(EncodingService.DecompressBuffer, EncodingService, data, COMPRESSION_ALGORITHM)
-		if not success then return nil end
+		if not success then return end
 		decompressed = newdata
 	end
 	local buflen = buffer.len(decompressed)
-	if buflen < HEADER_SIZE then return nil end
-	if buflen > MAX_ROBLOX_BUFFER_SIZE then return nil end
+	if buflen < HEADER_SIZE then return end
+	if buflen > MAX_ROBLOX_BUFFER_SIZE then return end
 
 	local identifier = buffer.readu16(decompressed,0)
-	if identifier ~= PACKED_BIT then return nil end
+	if identifier ~= PACKED_BIT then return end
 	-- The ID matches our global packed_bit, so this is a valid buffer.
 
 	local capacity = buffer.readu32(decompressed, PACKED_CAPACITY_OFFSET)
@@ -230,12 +227,12 @@ function StringBuilder.FromBuffer(data: buffer): StringBuilder?
 	local length = buffer.readu32(decompressed, PACKED_LENGTH_OFFSET)
 
 	if capacity < MIN_CAPACITY then
-		error("FromBuffer: malformed buffer, capacity cant be less than MIN_CAPACITY")
+		error("FromBuffer: malformed buffer, capacity cant be less than MIN_CAPACITY!")
 	elseif capacity > MAX_SB_BUFFER_SIZE then
 		error("FromBuffer: malformed buffer, capacity cant be more than MAX_SB_BUFFER_SIZE!")
 	end
 	if maxCapacity < MIN_MAX_CAPACITY then
-		error("FromBuffer: malformed buffer, maxCapacity cant be less than MIN_MAX_CAPACITY")
+		error("FromBuffer: malformed buffer, maxCapacity cant be less than MIN_MAX_CAPACITY!")
 	elseif maxCapacity > MAX_SB_BUFFER_SIZE then
 		error("FromBuffer: malformed buffer, maxCapacity cant be more than MAX_SB_BUFFER_SIZE!")
 	end
@@ -244,9 +241,9 @@ function StringBuilder.FromBuffer(data: buffer): StringBuilder?
 	end
 
 	-- More if statements to block garbage buffers
-	if length > capacity then return nil end
-	if capacity > maxCapacity then return nil end
-	if HEADER_SIZE + length ~= buflen then return nil end
+	if length > capacity then return end
+	if capacity > maxCapacity then return end
+	if HEADER_SIZE + length ~= buflen then return end
 
 	local self = StringBuilder.new(capacity, maxCapacity)
 	self._Length = length
@@ -329,22 +326,22 @@ function StringBuilder.Compare(self: StringBuilder, self2: StringBuilder): boole
 	local buf2 = self2._Buffer
 	local cursor = 0
 
-	-- Tier 1 (Fastest - reading 4 bytes at a time)
-	local u32_Limit = length // 4 -- ( "//" op divides and rounds down )
+	-- Main loop (reading 4 bytes at a time)
+	local u32_Limit = length // 4 -- ("//" op divides and rounds down)
 	for _ = 1, u32_Limit do
 		if buffer.readu32(buf1, cursor) ~= buffer.readu32(buf2, cursor) then 
 			return false 
 		end
 		cursor += 4
 	end
-	-- Tier 2 (Slower - reading 2 bytes at a time)
+	-- reading 2 bytes
 	if (length - cursor) >= 2 then
 		if buffer.readu16(buf1, cursor) ~= buffer.readu16(buf2, cursor) then
 			return false
 		end
 		cursor += 2
 	end
-	-- Tier 3 (Slowest - reading 1 byte at a time)
+	-- reading the last byte
 	if (length - cursor) == 1 then
 		if buffer.readu8(buf1, cursor) ~= buffer.readu8(buf2, cursor) then
 			return false
@@ -353,9 +350,6 @@ function StringBuilder.Compare(self: StringBuilder, self2: StringBuilder): boole
 
 	return true
 end
-
--- Allow using == operator on StringBuilders
-StringBuilderMeta.__eq = StringBuilder.Compare
 
 --[[
     Get specific character(s) starting from index
@@ -367,14 +361,14 @@ function StringBuilder.GetCharacters(self: StringBuilder, Index: number, Count: 
     Count = Count or 1
 	
 	if Index % 1 ~= 0 or Count % 1 ~= 0 then
-        error("GetCharacters: invalid Index")
+        error("GetCharacters: invalid Index!")
     end
 	
 	local Length = self._Length
     local EndIndex = Index + Count
 
     if Index < 0 or Index > Length or EndIndex < 0 or EndIndex > Length then
-        error("GetCharacters: access out of bounds")
+        error("GetCharacters: access out of bounds!")
     end
 
     if Count == 0 then
@@ -392,15 +386,15 @@ function StringBuilder.SetCharacters(self: StringBuilder, Index: number, Data: a
 	if not Index or Data == nil then
 		return self
 	end
-	local strData = tostring(Data)
-	if strData == "" then return self end
+	Data = tostring(Data)
+	if Data == "" then return self end
 
     if Index < 0 or Index % 1 ~= 0 then
-        error("SetCharacters: invalid Index")
+        error("SetCharacters: invalid Index!")
     end
 
-	local Count = #strData
-	local newLength = Index+Count
+	local Count = #Data
+	local newLength = Index + Count
 	local oldLength = self._Length
 
 	if newLength > self._Capacity then
@@ -411,7 +405,7 @@ function StringBuilder.SetCharacters(self: StringBuilder, Index: number, Data: a
 		buffer.fill(self._Buffer, oldLength, 0, Index - oldLength)
 	end
 
-	buffer.writestring(self._Buffer,Index,strData,Count)
+	buffer.writestring(self._Buffer, Index, Data, Count)
 
 	if newLength > oldLength then
 		self._Length = newLength
@@ -426,14 +420,13 @@ end
     Returns: success, capacity
 ]]
 function StringBuilder.EnsureCapacity(self: StringBuilder, EnsuredCapacity: number): (boolean, number)
-
-	if EnsuredCapacity % 1 ~= 0 then
-        error("EnsureCapacity: invalid EnsuredCapacity")
+	if not EnsuredCapacity or EnsuredCapacity < 0
+		or EnsuredCapacity > self._MaxCapacity or EnsuredCapacity % 1 ~= 0 then
+        error("EnsureCapacity: invalid EnsuredCapacity!")
     end
-	local newCapacity = math.clamp(EnsuredCapacity, 0, self._MaxCapacity)
-	local success = pcall(ResizeBuffer, self, newCapacity)
+	local success = pcall(ResizeBuffer, self, EnsuredCapacity)
 
-	return success and EnsuredCapacity <= newCapacity, self._Capacity
+	return success and EnsuredCapacity <= self._Capacity, self._Capacity
 end
 
 --[[
@@ -445,7 +438,7 @@ function StringBuilder.SetCapacity(self: StringBuilder, Capacity: number): numbe
 	if not Capacity then return self._Capacity end
 
 	if Capacity % 1 ~= 0 then
-        error("SetCapacity: invalid Capacity")
+        error("SetCapacity: invalid Capacity!")
     end
 	Capacity = math.clamp(Capacity, MIN_CAPACITY, MAX_SB_BUFFER_SIZE)
 	Capacity = math.min(Capacity, self._MaxCapacity)
@@ -470,15 +463,14 @@ end
 ]]
 function StringBuilder.SetMaxCapacity(self: StringBuilder, MaxCapacity: number)
 	if not MaxCapacity or MaxCapacity % 1 ~= 0 then
-        error("SetMaxCapacity: invalid MaxCapacity")
+        error("SetMaxCapacity: invalid MaxCapacity!")
     end
 	if MaxCapacity < self._Capacity then
 		error("SetMaxCapacity: MaxCapacity cant be less than Capacity!")
 	end
 	if MaxCapacity < MIN_MAX_CAPACITY then return end
-	if MaxCapacity > MAX_SB_BUFFER_SIZE then 
-		MaxCapacity = MAX_SB_BUFFER_SIZE
-	end
+	MaxCapacity = math.min(MaxCapacity, MAX_SB_BUFFER_SIZE)
+
 	self._MaxCapacity = MaxCapacity
 end
 
@@ -496,15 +488,14 @@ end
 ]]
 function StringBuilder.SetLength(self: StringBuilder, Length: number): StringBuilder
 	if not Length or Length < 0 or Length > self._MaxCapacity or Length % 1 ~= 0 then
-		error("SetLength: invalid Length")
+		error("SetLength: invalid Length!")
 	end
 
-	-- a,b comparison is faster than a function call
 	if Length > self._Capacity then
 		ResizeBuffer(self, Length)
 	end
-
 	local oldLength = self._Length
+
 	-- clear any old data if the set length is higher than the old length.
 	if Length > oldLength then
 		buffer.fill(self._Buffer, oldLength, 0, Length - oldLength)
@@ -520,11 +511,10 @@ end
 ]]
 function StringBuilder.Append(self: StringBuilder, Data: any): StringBuilder
 	if Data == nil then return self end
-	local strData = Data
-	if type(strData) ~= "string" then
-		strData = tostring(strData)
+	if type(Data) ~= "string" then
+		Data = tostring(Data)
 	end
-	local dataSize = #strData
+	local dataSize = #Data
 	if dataSize == 0 then return self end
 
 	local currentLength = self._Length
@@ -534,9 +524,8 @@ function StringBuilder.Append(self: StringBuilder, Data: any): StringBuilder
 		ResizeBuffer(self, newLength)
 	end
 
-	buffer.writestring(self._Buffer, currentLength, strData, dataSize)
+	buffer.writestring(self._Buffer, currentLength, Data, dataSize)
 	self._Length = newLength
-
 	return self
 end
 
@@ -545,7 +534,7 @@ end
     (appends and creates a new line using "\n")
 ]]
 function StringBuilder.AppendLine(self: StringBuilder, Data: any?): StringBuilder
-	StringBuilder.Append(self,Data)
+	StringBuilder.Append(self, Data)
 	StringBuilder.Newline(self)
 	return self
 end
@@ -605,29 +594,33 @@ end
 
 --[[
     Removes [Count] amount of letters starting from index
+	Count is optional (default: 1)
 ]]
-function StringBuilder.Remove(self: StringBuilder, Index: number, Count: number): StringBuilder
-	if not Index then return self end
-	if not Count or Count <= 0 then return self end
-
-	Index = math.floor(Index)
-	Count = math.floor(Count)
-
-	if Index < 0 or Index >= self._Length then return self end
+function StringBuilder.Remove(self: StringBuilder, Index: number, Count: number?): StringBuilder
+	local Length = self._Length
+	if not Index or Index < 0 or Index >= Length or Index % 1 ~= 0 then
+        error("Remove: invalid Index!")
+    end
+	Count = Count or 1
+	if Count < 0 or Count % 1 ~= 0 then
+        error("Remove: invalid Count!")
+    end
+	if Count == 0 then return self end
 
 	-- So we dont try to remove more characters than exist after the index
-	local actualCount = math.min(Count, self._Length - Index)
+	if Count > Length - Index then
+		error("Remove: end index out of bounds!")
+	end
 
-	local moveSource = Index + actualCount
-	local bytesToMove = self._Length - moveSource
+	local moveSource = Index + Count
+	local bytesToMove = Length - moveSource
 
 	if bytesToMove > 0 then
 		-- We shift the buffer down
 		buffer.copy(self._Buffer, Index, self._Buffer, moveSource, bytesToMove)
 	end
 
-	self._Length -= actualCount
-
+	self._Length -= Count
 	return self
 end
 
@@ -700,34 +693,28 @@ end
 	Errors if there's not enough available max capacity, or if the data can't fit.
 ]]
 function StringBuilder.Insert(self: StringBuilder, Index: number, Data: any): StringBuilder
-	if not Index then return self end
-	Index = math.floor(Index)
-	if Index < 0 then return self end
-	if Index > self._Length then return self end
-
+	if not Index or Index < 0 or Index > self._Length or Index % 1 ~= 0 then
+		error("Insert: invalid Index!")
+	end
 	if Data == nil then return self end
 	if type(Data) ~= "string" then
 		Data = tostring(Data)
 	end
-	if Data == "" then return self end
-
-	-- Clamp Index so theres no gaps
-	Index = math.min(Index, self._Length)
-
-
+	
 	local DataSize = #Data
+	if DataSize == 0 then return self end
 	local AvailableSpace = self._MaxCapacity - self._Length
 
 	-- Capacity check
 	if AvailableSpace < 1 then
-		error("Insert: No available space!")
+		error("Insert: no available space!")
 	end
 	if DataSize > AvailableSpace then
-		error("Insert: Data cant fully fit!")
+		error("Insert: data cant fully fit!")
 	end
 
 	local newLength = self._Length + DataSize
-	-- a,b comparison is faster than a function call
+
 	if newLength > self._Capacity then
 		ResizeBuffer(self, newLength)
 	end
@@ -749,9 +736,14 @@ end
 	returns the indices of the string where the occurrence starts and ends.
 ]]
 function StringBuilder.Find(self: StringBuilder, target: string, start: number?): (number?, number?)
-	const targetLength = #target
-	if targetLength == 0 then return nil end
 	const length = self._Length
+	if start then
+		if start < 0 or start > length or start % 1 ~= 0 then
+			error("Find: invalid start!")
+		end
+	else start = 0 end
+	const targetLength = #target
+	if targetLength == 0 then return end
 	const buf = self._Buffer
 
 	local pbytes = table.create(targetLength)
@@ -759,6 +751,7 @@ function StringBuilder.Find(self: StringBuilder, target: string, start: number?)
 		pbytes[i] = string.byte(target, i + 1)
 	end
 
+	-- special fast cases for 1 & 2 byte string searches
 	if targetLength == 1 then
 		local byte = pbytes[0]
 		for i = math.max(0, start or 0), length - 1 do
@@ -766,7 +759,7 @@ function StringBuilder.Find(self: StringBuilder, target: string, start: number?)
 				return i, i + 1
 			end
 		end
-		return nil
+		return
 	elseif targetLength == 2 then
 		local b0, b1 = pbytes[0], pbytes[1]
 		local limit = length - 2
@@ -776,7 +769,7 @@ function StringBuilder.Find(self: StringBuilder, target: string, start: number?)
 				return i, i + 2
 			end
 		end
-		return nil
+		return
 	end
 
 	local lps = table.create(targetLength, 0)
@@ -814,7 +807,7 @@ function StringBuilder.Find(self: StringBuilder, target: string, start: number?)
 		end
 	end
 
-	return nil
+	return
 end
 
 --[[
@@ -822,6 +815,7 @@ end
 	returns the indices of the string where the occurrence starts and ends.
 
 	Wrapper for string.find which is way faster than Find()
+	plain defaults to true unless set otherwise.
 
 	Note:
     To use string.find, this first converts the buffer into a 
@@ -829,10 +823,16 @@ end
     Use sparingly with large StringBuilders or frequent calls.
 ]]
 function StringBuilder.FindNative(self: StringBuilder, pattern: string, start: number?, plain: boolean?): (number?, number?)
-	local s = start or 0
-	local sIdx, eIdx = string.find(buffer.readstring(self._Buffer, s, self._Length - s), pattern, 0, plain)
+	const length = self._Length
+	if start then
+		if start < 0 or start > length or start % 1 ~= 0 then
+			error("FindNative: invalid start!")
+		end
+	else start = 0 end
+	if pattern == "" then return end
+	local sIdx, eIdx = string.find(buffer.readstring(self._Buffer, start, length - start), pattern, 0, plain == nil and true or plain)
 	if sIdx then
-		return sIdx + s - 1, eIdx + s - 1
+		return sIdx + start - 1, eIdx + start
 	end
 	return
 end
@@ -843,9 +843,14 @@ end
 function StringBuilder.Replace(self: StringBuilder, target: string, replacement: string, start: number?): StringBuilder
 	if type(target) ~= "string" then error("Replace: target is not a string!") end
 	if type(replacement) ~= "string" then error("Replace: replacement is not a string!") end
+	const length = self._Length
+	if start then
+		if start < 0 or start > length or start % 1 ~= 0 then
+			error("Replace: invalid start!")
+		end
+	else start = 0 end
 	if target == replacement then return self end
 
-	local length = self._Length
 	local targetLength = #target
 	if length == 0 or targetLength == 0 then return self end
 
@@ -875,7 +880,7 @@ function StringBuilder.Replace(self: StringBuilder, target: string, replacement:
 		end
 	end
 
-	i = 0
+	i = start
 	while i < length do
 		if pbytes[j] == buffer.readu8(buf, i) then
 			i += 1
@@ -896,6 +901,9 @@ function StringBuilder.Replace(self: StringBuilder, target: string, replacement:
 
 	local replacementLength = #replacement
 	local newLength = length + count * (replacementLength - targetLength)
+	if newLength > self._MaxCapacity then
+		error("Replace: result exceeds MaxCapacity!")
+	end
 	local newCapacity = math.max(newLength, self._Capacity)
 	local destBuf = buffer.create(newCapacity)
 	local readCursor = 0
@@ -995,5 +1003,7 @@ function StringBuilderMeta.__tostring(self: StringBuilder): string
 	return buffer.readstring(self._Buffer,0,self._Length)
 end
 
+-- Allow using == operator on StringBuilders
+StringBuilderMeta.__eq = StringBuilder.Compare
 
 return StringBuilder
